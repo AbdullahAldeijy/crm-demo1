@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ 'rtl' if lang == 'ar' else 'ltr' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - {{ t.site_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo"><a href="{{ url_for('index') }}">{{ t.site_name }}</a></h1>
+            <div class="nav-links">
+                {% if from_crm %}
+                <a href="{{ url_for('crm_dashboard') }}" class="btn btn-info">Back to CRM</a>
+                {% else %}
+                <a href="{{ url_for('index') }}" class="btn btn-info">Back to Platform</a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary">{{ t.logout }}</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="chat-page">
+            <div class="chat-header">
+                <h2>💬 Chat with {{ company.name }}</h2>
+                <p>Product: {{ product_title }}</p>
+            </div>
+            
+            <div class="chat-messages" id="chat-messages">
+                <div class="message welcome">
+                    <p>Hello! I am interested in "{{ product_title }}". How can you help me?</p>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <input type="text" id="message-input" placeholder="Type your message..." onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let messageCount = 1;
+        
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            const messagesContainer = document.getElementById('chat-messages');
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message sent';
+            userMessage.innerHTML = `<p>You: ${message}</p>`;
+            messagesContainer.appendChild(userMessage);
+            
+            // Auto-reply from company
+            setTimeout(() => {
+                const replies = [
+                    'Thank you for your interest!',
+                    'We can provide more details about this product.',
+                    'Would you like to schedule a meeting?',
+                    'Our team will contact you soon.',
+                    'Is there anything specific you need to know?'
+                ];
+                const reply = replies[Math.floor(Math.random() * replies.length)];
+                
+                const companyMessage = document.createElement('div');
+                companyMessage.className = 'message received';
+                companyMessage.innerHTML = `<p>{{ company.name }}: ${reply}</p>`;
+                messagesContainer.appendChild(companyMessage);
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 1000);
+            
+            input.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
