@@ -10,19 +10,21 @@
     <nav class="navbar">
         <div class="nav-container">
             <h1 class="nav-logo"><a href="{{ url_for('index') }}">{{ t.site_name }}</a></h1>
-            <div class="nav-links">
-                <div class="nav-controls">
-                    <button onclick="showSystemAnnouncements()" class="btn btn-notification" title="System Announcements">
-                        📢
-                        <span class="notification-badge">2</span>
-                    </button>
-                    <button onclick="toggleDarkMode()" class="btn btn-dark-toggle" title="Toggle Dark Mode">
-                        <span class="dark-icon">🌙</span>
-                        <span class="light-icon">☀️</span>
-                    </button>
-                    <div class="language-switcher">
-                        <a href="{{ url_for('index', lang='en') }}" class="lang-btn {{ 'active' if lang == 'en' else '' }}">EN</a>
-                        <a href="{{ url_for('index', lang='ar') }}" class="lang-btn {{ 'active' if lang == 'ar' else '' }}">عربي</a>
+            <div class="nav-info">
+                <div class="nav-buttons">
+                    <div class="nav-controls">
+                        <button onclick="showNotifications()" class="btn btn-notification" title="Notifications">
+                            🔔
+                            <span class="notification-badge" id="notificationBadge">3</span>
+                        </button>
+                        <button onclick="toggleDarkMode()" class="btn btn-dark-toggle" title="Toggle Dark Mode">
+                            <span class="dark-icon">🌙</span>
+                            <span class="light-icon">☀️</span>
+                        </button>
+                        <div class="language-switcher">
+                            <a href="{{ url_for('index', lang='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">EN</a>
+                            <a href="{{ url_for('index', lang='ar') }}" class="lang-btn {% if lang == 'ar' %}active{% endif %}">عربي</a>
+                        </div>
                     </div>
                 </div>
                 {% if session.company_id %}
@@ -331,33 +333,52 @@
             localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
         }
         
-        function showSystemAnnouncements() {
+        function showNotifications() {
             const modal = document.createElement('div');
-            modal.className = 'custom-modal';
+            modal.id = 'notificationsModal';
+            modal.className = 'modal';
+            modal.style.display = 'block';
             modal.innerHTML = `
-                <div class="custom-modal-content">
-                    <div class="custom-modal-header">
-                        <h3>📢 {% if lang == 'ar' %}إعلانات مدير النظام{% else %}System Administrator Announcements{% endif %}</h3>
-                        <span class="custom-modal-close" onclick="closeCustomModal()">&times;</span>
-                    </div>
-                    <div class="custom-modal-body">
-                        <ul style="text-align: left; padding-left: 20px;">
-                            <li>{% if lang == 'ar' %}مرحباً بشركة المباني الجديدة!{% else %}Welcome to new company Al-Mabani!{% endif %}</li>
-                            <li>{% if lang == 'ar' %}صيانة مجدولة يوم الجمعة 2-4 صباحاً{% else %}Scheduled maintenance Friday 2-4 AM{% endif %}</li>
-                        </ul>
-                    </div>
-                    <div class="custom-modal-footer">
-                        <button class="btn btn-primary" onclick="closeCustomModal()">{% if lang == 'ar' %}حسناً{% else %}OK{% endif %}</button>
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('notificationsModal')">&times;</span>
+                    <h2>{% if lang == 'ar' %}الإشعارات{% else %}Notifications{% endif %}</h2>
+                    <div class="notifications-list">
+                        <div class="notification-item">
+                            <div class="notification-icon">💬</div>
+                            <div class="notification-content">
+                                <h4>{% if lang == 'ar' %}رسالة جديدة{% else %}New Message{% endif %}</h4>
+                                <p>{% if lang == 'ar' %}رسالة جديدة من نسما وشركاهم{% else %}New message from Nesma & Partners{% endif %}</p>
+                                <span class="notification-time">5 {% if lang == 'ar' %}دقائق{% else %}minutes ago{% endif %}</span>
+                            </div>
+                        </div>
+                        <div class="notification-item">
+                            <div class="notification-icon">✅</div>
+                            <div class="notification-content">
+                                <h4>{% if lang == 'ar' %}مهمة منجزة{% else %}Task Completed{% endif %}</h4>
+                                <p>{% if lang == 'ar' %}تم إنجاز مهمة خدمة العملاء{% else %}Customer service task completed{% endif %}</p>
+                                <span class="notification-time">1 {% if lang == 'ar' %}ساعة{% else %}hour ago{% endif %}</span>
+                            </div>
+                        </div>
+                        <div class="notification-item">
+                            <div class="notification-icon">🎉</div>
+                            <div class="notification-content">
+                                <h4>{% if lang == 'ar' %}مكافأة مستحقة{% else %}Reward Earned{% endif %}</h4>
+                                <p>{% if lang == 'ar' %}تم صرف مكافأة 1,500 ريال{% else %}Reward of 1,500 SAR has been paid{% endif %}</p>
+                                <span class="notification-time">2 {% if lang == 'ar' %}ساعات{% else %}hours ago{% endif %}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
         }
         
-        function closeCustomModal() {
-            const modal = document.querySelector('.custom-modal');
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
             if (modal) modal.remove();
         }
+        
+
         
 
         
@@ -371,5 +392,6 @@
             }
         });
     </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

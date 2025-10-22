@@ -560,6 +560,8 @@
                         <div class="contract-actions">
                             <button class="btn btn-primary" onclick="showContractInline('CONTRACT-001')">View Contract</button>
                             <button class="btn btn-secondary" onclick="printContractInline()">Print</button>
+                            <a href="/contract/CONTRACT-001/pdf" target="_blank" class="btn btn-info">Download PDF</a>
+                            <a href="/contract/CONTRACT-001/print" class="btn btn-warning">POS Print</a>
                         </div>
                     </div>
                     
@@ -575,6 +577,8 @@
                         <div class="contract-actions">
                             <button class="btn btn-primary" onclick="showContractInline('CONTRACT-002')">View Contract</button>
                             <button class="btn btn-secondary" onclick="printContractInline()">Print</button>
+                            <a href="/contract/CONTRACT-002/pdf" target="_blank" class="btn btn-info">Download PDF</a>
+                            <a href="/contract/CONTRACT-002/print" class="btn btn-warning">POS Print</a>
                         </div>
                     </div>
                     
@@ -590,6 +594,8 @@
                         <div class="contract-actions">
                             <button class="btn btn-primary" onclick="showContractInline('CONTRACT-003')">View Contract</button>
                             <button class="btn btn-secondary" onclick="printContractInline()">Print</button>
+                            <a href="/contract/CONTRACT-003/pdf" target="_blank" class="btn btn-info">Download PDF</a>
+                            <a href="/contract/CONTRACT-003/print" class="btn btn-warning">POS Print</a>
                         </div>
                     </div>
                 </div>
@@ -1908,6 +1914,75 @@
                 '{% if lang == "ar" %}تم إضافة الموظف{% else %}Employee Added{% endif %}',
                 '{% if lang == "ar" %}تم إضافة الموظف بنجاح{% else %}Employee added successfully{% endif %}'
             );
+        });
+        
+        // Handle task form submission
+        document.getElementById('addTaskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const taskData = {
+                title: document.getElementById('taskTitle').value,
+                description: document.getElementById('taskDescription').value,
+                assigned_to: document.getElementById('assignedTo').value,
+                reward: document.getElementById('taskReward').value,
+                due_date: document.getElementById('dueDate').value
+            };
+            
+            fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add new task to the grid
+                    const tasksGrid = document.querySelector('.tasks-grid');
+                    const newTaskCard = document.createElement('div');
+                    newTaskCard.className = 'task-card';
+                    
+                    // Find employee name
+                    const assignedSelect = document.getElementById('assignedTo');
+                    const employeeName = assignedSelect.options[assignedSelect.selectedIndex].text;
+                    
+                    newTaskCard.innerHTML = `
+                        <div class="task-header">
+                            <h3>${taskData.title}</h3>
+                            <span class="task-status pending">{% if lang == 'ar' %}قيد التنفيذ{% else %}Pending{% endif %}</span>
+                        </div>
+                        <p class="task-description">${taskData.description}</p>
+                        <div class="task-details">
+                            <p><strong>{% if lang == 'ar' %}معين إلى:{% else %}Assigned to:{% endif %}</strong> ${employeeName}</p>
+                            <p><strong>{% if lang == 'ar' %}المكافأة:{% else %}Reward:{% endif %}</strong> ${taskData.reward} {% if lang == 'ar' %}ريال{% else %}SAR{% endif %}</p>
+                            <p><strong>{% if lang == 'ar' %}تاريخ الانتهاء:{% else %}Due Date:{% endif %}</strong> ${taskData.due_date}</p>
+                        </div>
+                        <button class="btn btn-success" onclick="completeTask(${data.task.id})">{% if lang == 'ar' %}إنجاز المهمة{% else %}Mark Complete{% endif %}</button>
+                    `;
+                    
+                    tasksGrid.appendChild(newTaskCard);
+                    
+                    // Close modal and reset form
+                    closeModal('addTaskModal');
+                    document.getElementById('addTaskForm').reset();
+                    
+                    showSuccessModal(
+                        '{% if lang == "ar" %}تم إضافة المهمة{% else %}Task Added{% endif %}',
+                        '{% if lang == "ar" %}تم إضافة المهمة بنجاح{% else %}Task added successfully{% endif %}'
+                    );
+                } else {
+                    showSuccessModal(
+                        '{% if lang == "ar" %}خطأ{% else %}Error{% endif %}',
+                        data.error || '{% if lang == "ar" %}حدث خطأ{% else %}An error occurred{% endif %}'
+                    );
+                }
+            })
+            .catch(error => {
+                console.error('Error adding task:', error);
+                showSuccessModal(
+                    '{% if lang == "ar" %}خطأ{% else %}Error{% endif %}',
+                    '{% if lang == "ar" %}حدث خطأ في الشبكة{% else %}Network error occurred{% endif %}'
+                );
+            });
         });
         
         function showAssignModal(productId, productTitle, productCompany) {

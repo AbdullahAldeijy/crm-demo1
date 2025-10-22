@@ -147,10 +147,6 @@
         const approved = {{ 'true' if approved else 'false' }};
 
         function proceedWithTorbiona() {
-            console.log('Proceed with Torbiona clicked');
-            console.log('Approved:', approved);
-            console.log('Order data:', orderData);
-            
             if (!approved) {
                 alert('{{ "غير مؤهل للدفع عبر توربيونا" if lang == "ar" else "Not eligible for Torbiona payment" }}');
                 return;
@@ -158,11 +154,9 @@
             
             if (!orderData) {
                 alert('{{ "بيانات الطلب غير متوفرة" if lang == "ar" else "Order data not available" }}');
-                console.error('Order data is null or undefined');
                 return;
             }
             
-            // Generate contracts first
             fetch('/api/generate_contracts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -173,46 +167,64 @@
                     total_amount: orderData.totalPrice
                 })
             })
-            .then(response => {
-                console.log('Contract response:', response);
-                return response.json();
-            })
-            .then(contractData => {
-                console.log('Contract data:', contractData);
-                if (contractData.success) {
-                    // Then process payment
-                    return fetch('/api/purchase', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            company_id: orderData.companyId,
-                            product_id: orderData.productId,
-                            quantity: orderData.quantity,
-                            payment_method: 'torbiona',
-                            total_amount: orderData.totalPrice
-                        })
-                    });
-                } else {
-                    throw new Error('Contract generation failed');
-                }
-            })
-            .then(response => {
-                console.log('Purchase response:', response);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('Purchase data:', data);
-                if (data.success) {
-                    alert('{{ "تم الدفع بنجاح عبر توربيونا! تم إنشاء عقدين: الأول بين المشتري وتوربيونا، والثاني بين المشتري والبائع" if lang == "ar" else "Payment successful via Torbiona! Two contracts generated: 1) Buyer-Torbiona 2) Buyer-Seller" }}');
-                    window.close();
+                if (data.success && data.payment_plan) {
+                    showPaymentPlan(data.payment_plan, orderData.totalPrice);
                 } else {
-                    alert('{{ "فشل في الدفع: " if lang == "ar" else "Payment failed: " }}' + data.message);
+                    alert('Error generating payment plan');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('{{ "حدث خطأ في المعاملة: " if lang == "ar" else "Transaction error: " }}' + error.message);
+                alert('Error processing request');
             });
+        }
+        
+        function showPaymentPlan(paymentPlan, totalAmount) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center';
+            
+            let planHTML = '<div style="background:white;border-radius:20px;padding:40px;max-width:600px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)"><div style="text-align:center;margin-bottom:30px"><div style="width:80px;height:80px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:white;font-size:2rem"><i class="fas fa-calendar-alt"></i></div><h2 style="font-size:1.8rem;color:#2d3748;margin-bottom:10px">{{ "خطة الدفع من تربيونا" if lang == "ar" else "Torbiona Payment Plan" }}</h2><p style="color:#718096">{{ "خطة دفع مرنة ومريحة" if lang == "ar" else "Flexible and convenient payment schedule" }}</p></div><div style="display:flex;flex-direction:column;gap:15px">';
+            
+            paymentPlan.forEach(payment => {
+                planHTML += '<div style="background:linear-gradient(135deg,#f7fafc 0%,#edf2f7 100%);border-radius:15px;padding:20px;border-left:4px solid #667eea;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:0.9rem;color:#718096;margin-bottom:5px">' + payment.label + '</div><div style="font-size:1.3rem;font-weight:700;color:#2d3748">' + payment.percentage + '%</div><div style="font-size:0.85rem;color:#a0aec0;margin-top:3px">' + payment.date + '</div></div><div style="text-align:right"><div style="font-size:1.5rem;font-weight:700;color:#667eea">$' + payment.amount.toFixed(2) + '</div></div></div>';
+            });
+            
+            planHTML += '</div><div style="text-align:center;margin-top:30px"><button onclick="completeTorbionePayment()" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;padding:15px 40px;border-radius:50px;font-size:1.1rem;cursor:pointer;margin-right:10px">{{ "موافق" if lang == "ar" else "Confirm" }}</button><button onclick="closePaymentPlan()" style="background:#e2e8f0;color:#2d3748;border:none;padding:15px 40px;border-radius:50px;font-size:1.1rem;cursor:pointer">{{ "إلغاء" if lang == "ar" else "Cancel" }}</button></div></div>';
+            
+            modal.innerHTML = planHTML;
+            document.body.appendChild(modal);
+            
+            window.closePaymentPlan = function() {
+                modal.remove();
+            };
+            
+            window.completeTorbionePayment = function() {
+                modal.remove();
+                fetch('/api/purchase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_id: orderData.companyId,
+                        product_id: orderData.productId,
+                        quantity: orderData.quantity,
+                        payment_method: 'torbiona'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('{{ "تم الدفع بنجاح عبر توربيونا!" if lang == "ar" else "Payment successful via Torbiona!" }}');
+                        window.close();
+                    } else {
+                        alert('{{ "فشل في الدفع" if lang == "ar" else "Payment failed" }}');
+                    }
+                })
+                .catch(error => {
+                    alert('{{ "حدث خطأ" if lang == "ar" else "Error occurred" }}');
+                });
+            };
         }
 
         function usePayNow() {

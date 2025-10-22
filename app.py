@@ -1,6 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response
 import json
 from datetime import datetime
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from io import BytesIO
 
 app = Flask(__name__)
 app.secret_key = 'crm-platform-secret-key-2024'
@@ -144,6 +150,9 @@ translations = {
 
 # Chat messages storage
 chat_messages = {}
+
+# Tasks storage
+tasks = []
 
 # Purchase orders storage with ratings
 purchase_orders = [
@@ -1027,6 +1036,16 @@ def generate_contracts():
     quantity = data['quantity']
     total_amount = float(data['total_amount'])
     
+    # Generate payment plan
+    from datetime import timedelta
+    today = datetime.now()
+    payment_plan = [
+        {'percentage': 20, 'amount': total_amount * 0.20, 'date': today.strftime('%Y-%m-%d'), 'label': 'Today'},
+        {'percentage': 40, 'amount': total_amount * 0.40, 'date': (today + timedelta(days=30)).strftime('%Y-%m-%d'), 'label': 'After 1 Month'},
+        {'percentage': 25, 'amount': total_amount * 0.25, 'date': (today + timedelta(days=60)).strftime('%Y-%m-%d'), 'label': 'After 2 Months'},
+        {'percentage': 15, 'amount': total_amount * 0.15, 'date': (today + timedelta(days=90)).strftime('%Y-%m-%d'), 'label': 'After 3 Months'}
+    ]
+    
     contract_id_1 = f"TRB-{datetime.now().strftime('%Y%m%d')}-{len(contracts) + 1:03d}"
     contract_id_2 = f"PUR-{datetime.now().strftime('%Y%m%d')}-{len(contracts) + 2:03d}"
     
@@ -1041,7 +1060,8 @@ def generate_contracts():
         'date': datetime.now().strftime('%Y-%m-%d'),
         'type': 'buyer-torbiona',
         'product': product_title,
-        'quantity': quantity
+        'quantity': quantity,
+        'payment_plan': payment_plan
     }
     
     purchase_contract = {
@@ -1055,7 +1075,8 @@ def generate_contracts():
         'date': datetime.now().strftime('%Y-%m-%d'),
         'type': 'buyer-seller',
         'product': product_title,
-        'quantity': quantity
+        'quantity': quantity,
+        'payment_plan': payment_plan
     }
     
     contracts.extend([torbiona_contract, purchase_contract])
@@ -1063,6 +1084,7 @@ def generate_contracts():
     return jsonify({
         'success': True,
         'contracts': [contract_id_1, contract_id_2],
+        'payment_plan': payment_plan,
         'message': 'تم إنشاء العقود بنجاح'
     })
 
@@ -1282,6 +1304,222 @@ def assign_delivery():
         })
     
     return jsonify({'success': True, 'message': 'Delivery service assigned successfully'})
+
+@app.route('/contract/<contract_id>/pdf')
+def generate_contract_pdf(contract_id):
+    # Contract data
+    contracts_data = {
+        'CONTRACT-001': {
+            'number': 'CONTRACT-001',
+            'date': 'December 1, 2024',
+            'buyer': companies[session.get('company_id', 'binladin')]['name'],
+            'seller': 'Construction Equipment Co.',
+            'product': 'Heavy Construction Equipment',
+            'quantity': '2',
+            'unit_price': '$225,000.00',
+            'total': '$450,000.00'
+        },
+        'CONTRACT-002': {
+            'number': 'CONTRACT-002',
+            'date': 'November 28, 2024',
+            'buyer': 'Al-Saif Construction',
+            'seller': companies[session.get('company_id', 'binladin')]['name'],
+            'product': 'Steel Reinforcement Bars',
+            'quantity': '100',
+            'unit_price': '$2,800.00',
+            'total': '$280,000.00'
+        },
+        'CONTRACT-003': {
+            'number': 'CONTRACT-003',
+            'date': 'November 25, 2024',
+            'buyer': companies[session.get('company_id', 'binladin')]['name'],
+            'seller': 'Torbiona Financial Services',
+            'product': 'Financing Agreement',
+            'quantity': '1',
+            'unit_price': '$125,000.00',
+            'total': '$125,000.00'
+        }
+    }
+    
+    contract = contracts_data.get(contract_id, contracts_data['CONTRACT-001'])
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, spaceAfter=30, alignment=1)
+    heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, spaceAfter=12)
+    normal_style = styles['Normal']
+    
+    # Build PDF content
+    story = []
+    
+    # Header
+    story.append(Paragraph("MIZZANINE CRM PLATFORM", title_style))
+    story.append(Paragraph("B2B PURCHASE ORDER CONTRACT", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Contract details
+    story.append(Paragraph(f"Contract No: {contract['number']}", normal_style))
+    story.append(Paragraph(f"Date: {contract['date']}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Parties
+    story.append(Paragraph("PARTIES", heading_style))
+    story.append(Paragraph(f"<b>Buyer:</b> {contract['buyer']}", normal_style))
+    story.append(Paragraph("Address: Riyadh, Saudi Arabia", normal_style))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(f"<b>Seller:</b> {contract['seller']}", normal_style))
+    story.append(Paragraph("Address: Jeddah, Saudi Arabia", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Product details
+    story.append(Paragraph("PRODUCT DETAILS", heading_style))
+    data = [
+        ['Item', 'Description', 'Quantity', 'Unit Price', 'Total'],
+        ['1', contract['product'], contract['quantity'], contract['unit_price'], contract['total']]
+    ]
+    
+    table = Table(data, colWidths=[0.5*inch, 2.5*inch, 1*inch, 1*inch, 1*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    story.append(table)
+    story.append(Spacer(1, 20))
+    
+    # Terms
+    story.append(Paragraph("TERMS AND CONDITIONS", heading_style))
+    story.append(Paragraph("1. Payment: 50% advance, 50% on delivery", normal_style))
+    story.append(Paragraph("2. Delivery: As per agreed schedule", normal_style))
+    story.append(Paragraph("3. Warranty: 12 months from delivery date", normal_style))
+    story.append(Paragraph("4. Governing Law: Saudi Arabia", normal_style))
+    story.append(Spacer(1, 30))
+    
+    # Signatures
+    story.append(Paragraph("SIGNATURES", heading_style))
+    story.append(Spacer(1, 40))
+    
+    sig_data = [
+        ['Buyer Signature', 'Seller Signature'],
+        ['_____________________', '_____________________'],
+        [f'Name: {contract["buyer"]}', f'Name: {contract["seller"]}'],
+        ['Date: _______________', 'Date: _______________']
+    ]
+    
+    sig_table = Table(sig_data, colWidths=[3*inch, 3*inch])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12)
+    ]))
+    
+    story.append(sig_table)
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=contract_{contract_id}.pdf'
+    
+    return response
+
+@app.route('/contract/<contract_id>/print')
+def print_contract_pos(contract_id):
+    # POS printer format (80mm thermal printer)
+    contracts_data = {
+        'CONTRACT-001': {
+            'number': 'CONTRACT-001',
+            'date': 'December 1, 2024',
+            'buyer': companies[session.get('company_id', 'binladin')]['name'],
+            'seller': 'Construction Equipment Co.',
+            'product': 'Heavy Construction Equipment',
+            'total': '$450,000.00'
+        }
+    }
+    
+    contract = contracts_data.get(contract_id, contracts_data['CONTRACT-001'])
+    
+    # Generate POS receipt format
+    receipt = f"""
+================================
+        MIZZANINE CRM
+     CONTRACT RECEIPT
+================================
+Contract: {contract['number']}
+Date: {contract['date']}
+
+BUYER:
+{contract['buyer']}
+
+SELLER:
+{contract['seller']}
+
+PRODUCT:
+{contract['product']}
+
+TOTAL: {contract['total']}
+
+================================
+     THANK YOU!
+================================
+
+
+
+"""
+    
+    response = make_response(receipt)
+    response.headers['Content-Type'] = 'text/plain'
+    response.headers['Content-Disposition'] = f'attachment; filename=pos_receipt_{contract_id}.txt'
+    
+    return response
+
+@app.route('/api/tasks', methods=['GET', 'POST'])
+def api_tasks():
+    if 'company_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    company_id = session['company_id']
+    user_role = session.get('role', 'company')
+    
+    # Only managers can create tasks
+    if user_role not in ['manager'] and session.get('user_type') != 'company':
+        return jsonify({'error': 'Insufficient permissions'}), 403
+    
+    if request.method == 'POST':
+        data = request.json
+        
+        new_task = {
+            'id': len(tasks) + 1,
+            'title': data['title'],
+            'description': data['description'],
+            'assigned_to': data['assigned_to'],
+            'reward': float(data['reward']),
+            'due_date': data['due_date'],
+            'status': 'pending',
+            'company_id': company_id,
+            'created_date': datetime.now().strftime('%Y-%m-%d')
+        }
+        
+        tasks.append(new_task)
+        
+        return jsonify({'success': True, 'task': new_task})
+    
+    # Return tasks for this company
+    company_tasks = [task for task in tasks if task['company_id'] == company_id]
+    return jsonify(company_tasks)
 
 @app.route('/company/<company_id>')
 def company_page(company_id):

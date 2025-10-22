@@ -424,9 +424,31 @@ function handleEnter(event) {
     }
 }
 
+// Dark mode toggle
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+}
+
+// Notifications
+function showNotifications() {
+    const modal = document.getElementById('notificationsModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
 // Initialize dashboard when page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateDashboardStats);
+    document.addEventListener('DOMContentLoaded', function() {
+        updateDashboardStats();
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+    });
 } else {
     updateDashboardStats();
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
 }
